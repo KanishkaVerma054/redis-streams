@@ -1,24 +1,40 @@
-import { createClient } from "redis";
+import {createClient} from "redis";
 
 async function main() {
-    const client = await createClient()
+    while(1) {
+        const client = await createClient()
         .on("error", (err) => console.log("Redis Client Error", err))
         .connect();
 
-    const res = await client.xReadGroup('india', 'india-1', {
-        key: 'betteruptime:websites',
-        id: '>'
-    }, {
-        COUNT: 2
-    });
+        const res = await client.xReadGroup('usa', 'us-1', {
+            key: 'betteruptime:websites',
+            id: '>'
+        }, {
+            COUNT: 2
+        })
 
-    if(!res) {
-        client.destroy();
-        return;
+        if (!res) {
+            return;
+        }
+
+        let websitesToTrack = res[0].messages;
+        websitesToTrack.forEach(website => {
+            let startTime = Date.now()
+            axios.get(website.url)
+                .then(() => {
+                    prismaClient.WebsiteTick.create({
+                        status: "GOOD",
+                        response_time_ms: Date.now() - startTime,
+                        region_id: "india",
+                        website_id: website.id
+                    })
+                })
+                .catch(() => {
+
+                })
+        })
+
     }
-    // @ts-ignore
-    console.log(res[0].messages);
-    client.destroy();
 }
 
-main()
+main();
